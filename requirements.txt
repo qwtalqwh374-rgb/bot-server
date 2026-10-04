@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pydantic
+pyrogram
+kvsqlite
+tgcrypto
