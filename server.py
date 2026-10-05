@@ -1,6 +1,7 @@
 import os
 import signal
 import subprocess
+import sys
 from fastapi import FastAPI, Query
 from pydantic import BaseModel
 import uvicorn
@@ -21,7 +22,9 @@ def home():
 
 @app.post("/start_bot")
 def start_bot(data: BotPayload):
-    bot_id = data.bot_token.split(":")[0]
+    token = data.bot_token.strip()
+    owner = str(data.owner_id).strip()
+    bot_id = token.split(":")[0]
 
     # فحص إذا كان البوت شغال بالفعل
     if bot_id in running_bots:
@@ -30,15 +33,15 @@ def start_bot(data: BotPayload):
             return {"status": "already_running", "message": "البوت يعمل بالفعل!"}
 
     env_vars = os.environ.copy()
-    env_vars["BOT_TOKEN"] = data.bot_token
-    env_vars["OWNER_ID"] = str(data.owner_id)
+    env_vars["BOT_TOKEN"] = token
+    env_vars["OWNER_ID"] = owner
 
     try:
+        # استخدام sys.executable لضمان استخدام نفس بايثون والبيئة الافتراضية
+        # تم إزالة DEVNULL لتظهر رسائل بايثون وتيليجرام في سجلات Railway مباشرة
         proc = subprocess.Popen(
-            ["python3", "bot.py"],
-            env=env_vars,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            [sys.executable, "bot.py"],
+            env=env_vars
         )
         running_bots[bot_id] = proc
         return {
@@ -51,6 +54,7 @@ def start_bot(data: BotPayload):
 
 @app.post("/stop_bot")
 def stop_bot(bot_id: str = Query(...)):
+    bot_id = bot_id.strip()
     if bot_id in running_bots:
         proc = running_bots[bot_id]
         if proc.poll() is None:
@@ -63,5 +67,5 @@ def stop_bot(bot_id: str = Query(...)):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("server:app", host="0.0.0.0", port=port)
